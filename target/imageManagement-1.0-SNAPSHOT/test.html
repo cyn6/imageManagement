@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<template>
+    <basic-container>
+        <el-row :gutter="12" v-loading="loading">
+            <!-- date遍历循环的数据 -->
+            <el-col :span="6" v-for="item in data" :key="item.id">
+                <el-card shadow="hover"><!--style="background-color: #5daf34"  灰 #e1e1e1 绿 #5daf34-->
+                    <!-- 卡片的头部位 -->
+                    <template #header>
+                        <div class="card-header">
+                            <!--
+                                这里声明一下,我在多选时,往数组中添加的是对象
+                                label属性:是多选框的值,若该标签中无内容,则该属性也充当 checkbox 按钮后的介绍
+                                @change:改变事件,多选框勾选和取消勾选都会触发事件,所以在取消勾选时要删除勾选状态下的值
+                            -->
+                            <el-checkbox v-model="checked" :label="item.id" @change="ids(item)">{{name}}</el-checkbox>
+                            <div>
+                                <!-- 修改按钮 -->
+                                <el-button type="text" icon="el-icon-edit-outline" @click="handleUpdate(item)"/>
+                                <!-- 删除按钮 -->
+                                <el-button type="text" icon="el-icon-delete" @click="rowDel(item.id)"/>
+                                <!-- 开关按钮 -->
+                                <el-button type="text" icon="el-icon-switch-button" @click="devicePowerBtn(item)"/>
+                            </div>
+                        </div>
+                    </template>
+                    <!-- 卡片显示的内容 -->
+                    <div>
+                        卡片中显示的内容
+                    </div>
+                </el-card>
+            </el-col>
+        </el-row>
+
+        <!-- 分页 -->
+        <div class="blockPage">
+            <el-pagination
+                    @size-change="sizeChange"
+                    @current-change="currentChange"
+                    :page.sync="page"
+                    :pager-count="10"
+                    :page-sizes="[12,24,36,48]"
+                    :page-size="page.pageSize"
+                    layout="total, sizes, prev, pager, next, jumper"
+                    :total="page.total">
+            </el-pagination>
+        </div>
+    </basic-container>
+</template>
+
+<script>
+    import {add, getDetail, getList, remove, update} from "@/api/接口js文件";
+
+    export default {
+        data() {
+            return {
+                //多选默认不选中
+                checked = false,
+                page: {
+                    pageSize: 12,
+                    currentPage: 1,
+                    total: 0
+                },
+                selectionList: [],
+                data: []
+            }
+        },
+
+        methods: {
+            //获取数组中数值的下标
+            indexOf(val,ids) {
+                for (let i = 0; i < ids.length; i++) {
+                    //获取当前值的下标
+                    if (ids[i] === val)
+                        return i;
+                }
+                return -1;
+            },
+            //多选赋值ids
+            ids(val) {
+                let ids = this.selectionList;
+                //检索下标,判断当前值(或对象是否在数组中); 在则返回下标,不在则返回-1
+                let index = this.indexOf(val,ids);
+                if (ids.length >0 && index > -1) {
+                    //删除数组中的某个元素(在取消勾选时,删除数组中的值)
+                    ids.splice(index,1);
+                }else {
+                    //添加到数组中
+                    ids.push(val);
+                    //用逗号隔开
+                    ids.join(",");
+                }
+            },
+
+            //新增接口
+            rowSave(row, done, loading) {
+                add(row).then(() => {
+                    this.onLoad(this.page);
+                    this.$message({
+                        type: "success",
+                        message: "操作成功!"
+                    });
+                    done();
+                }, error => {
+                    loading();
+                    window.console.log(error);
+                });
+            },
+            //修改接口
+            rowUpdate(row, index, done, loading) {
+                update(row).then(() => {
+                    this.onLoad(this.page);
+                    this.$message({
+                        type: "success",
+                        message: "操作成功!"
+                    });
+                    done();
+                }, error => {
+                    loading();
+                    console.log(error);
+                });
+            },
+            //删除接口
+            rowDel(row) {
+                this.$confirm("确定将选择数据删除?", {
+                    confirmButtonText: "确定",
+                    cancelButtonText: "取消",
+                    type: "warning"
+                })
+                    .then(() => {
+                        //删除
+                        return remove(row.id);
+                    })
+                    .then(() => {
+                        this.onLoad(this.page);
+                        this.$message({
+                            type: "success",
+                            message: "操作成功!"
+                        });
+                    });
+            },
+
+            searchReset() {
+                this.query = {};
+                this.onLoad(this.page);
+            },
+            searchChange(params, done) {
+                this.query = params;
+                this.page.currentPage = 1;
+                this.onLoad(this.page, params);
+                done();
+            },
+            selectionClear() {
+                this.$refs.crud.toggleSelection();
+            },
+            currentChange(currentPage) {
+                this.page.currentPage = currentPage;
+            },
+            sizeChange(pageSize) {
+                this.page.pageSize = pageSize;
+            },
+            refreshChange() {
+                this.onLoad(this.page, this.query);
+            },
+            //分页接口
+            onLoad(page, params = {}) {
+                this.loading = true;
+                getList(page.currentPage, page.pageSize, Object.assign(params, this.query)).then(res => {
+                    const data = res.data.data;
+                    this.page.total = data.total;
+                    this.data = data.records;
+                    this.loading = false;
+                    this.selectionClear();
+                });
+            }
+
+        }
+
+</script>
+
+</body>
+</html>

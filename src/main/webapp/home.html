@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>农业数据库管理系统</title>
+
+    <style>
+
+
+        .time {
+            font-size: 13px;
+            color: #999;
+        }
+
+        /*.bottom {*/
+        /*    margin-top: 13px;*/
+        /*    line-height: 12px;*/
+        /*}*/
+
+        .button {
+            padding: 0;
+            float: right;
+        }
+
+        .image {
+            width: 100%;
+            height: 160px;
+            display: block;
+
+        }
+
+        /*.clearfix:before,*/
+        /*.clearfix:after {*/
+        /*    display: table;*/
+        /*    content: "";*/
+        /*}*/
+
+        /*.clearfix:after {*/
+        /*    clear: both*/
+        /*}*/
+    </style>
+
+</head>
+<body>
+
+<div id="app">
+    <!--    搜索表单-->
+    <el-form :inline="true" :model="diseaseData" class="demo-form-inline">
+
+        <el-form-item label="作物名称">
+            <el-select v-model="diseaseData.cropName" placeholder="作物名称" @change="handleChange">
+                <el-option v-for="item in cropItem" :value="item" :key="item"></el-option>
+            </el-select>
+        </el-form-item>
+
+        <el-form-item label="疾病类型">
+            <el-select v-model="diseaseData.diseaseName" placeholder="疾病类型">
+                <el-option v-if="diseaseData.cropName==='水稻'" v-for="item in diseaseItem[0]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='玉米'" v-for="item in diseaseItem[1]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='小麦'" v-for="item in diseaseItem[2]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='甜菜'" v-for="item in diseaseItem[3]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='苜蓿'" v-for="item in diseaseItem[4]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='葡萄'" v-for="item in diseaseItem[5]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='柑橘'" v-for="item in diseaseItem[6]" :value="item" :key="item"></el-option>
+                <el-option v-if="diseaseData.cropName==='芒果'" v-for="item in diseaseItem[7]" :value="item" :key="item"></el-option>
+            </el-select>
+        </el-form-item>
+
+        <el-form-item>
+            <el-button type="primary" @click="onSubmitSelect">查询</el-button>
+        </el-form-item>
+    </el-form>
+
+    <!--    按钮-->
+    <el-row>
+        <el-button type="primary" plain @click="dialogVisible = true">导入</el-button>
+        <el-button type="danger" plain @click="deleteByids">批量删除</el-button>
+    </el-row>
+
+    <!--    上传表单-->
+    <el-dialog
+            title="导入数据"
+            :visible.sync="dialogVisible"
+            width="30%"
+            :before-close="handleClose"
+            center>
+        <el-form ref="form" :model="diseaseData" label-width="80px">
+            <el-form-item label="作物名称">
+                <el-input v-model="diseaseData.cropName"></el-input>
+            </el-form-item>
+            <el-form-item label="疾病名称">
+                <el-input v-model="diseaseData.diseaseName"></el-input>
+            </el-form-item>
+
+            <el-form-item label="上传图像">
+                <el-upload
+                        ref="upload"
+                        action=""
+                        :on-exceed="handleExceed"
+                        limit="1"
+                        :http-request="httpRequest"
+                        :on-change="getFile"
+                        :before-upload="beforeUploadFile"
+                        :file-list="fileList"
+                        list-type="picture">
+                    <el-button size="small" type="primary">点击上传</el-button>
+                    <div slot="tip" class="el-upload__tip">请上传一张jpg/png图像，不超过5MB</div>
+                </el-upload>
+            </el-form-item>
+        </el-form>
+        <div slot="footer">
+            <el-button type="primary" @click="onSubmitForm" v-loading.fullscreen.lock="fullscreenLoading">立即导入
+            </el-button>
+            <el-button @click="dialogVisible = false">取消</el-button>
+        </div>
+    </el-dialog>
+
+
+    <!--数据-->
+    <el-row :gutter="5" style="margin-left:30px;margin-right:30px;margin-top:20px;margin-bottom: 20px">
+
+        <el-col :span="3" v-for="item in dataList" :key="item.id">
+            <el-card :body-style="{ padding: '5px' }" style="height:100%;">
+                <el-image :src="geturl(item.imagePath)" class="image">
+                    <div slot="placeholder" class="image-slot">
+                        加载中<span class="dot">...</span>
+                    </div>
+                </el-image>
+                <div>
+                    <div style="padding: 3px;">
+                        <span>{{item.cropName}}</span>
+                        <span style="float:right">{{item.diseaseName}}</span>
+                    </div>
+                    <div>
+                        <span class="time">{{item.addTime}}</span>
+                        <el-checkbox style="float:right;" :label="item.id"
+                                     @change="ids(item.id)"></el-checkbox>
+                    </div>
+
+                </div>
+            </el-card>
+        </el-col>
+    </el-row>
+
+    <!--    分页-->
+    <el-pagination
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+            :current-page="currentPage"
+            :page-sizes="[24, 48, 96, 192]"
+            :page-size="pageSize"
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="totalCount">
+    </el-pagination>
+
+</div>
+
+
+<script src="js/vue.js"></script>
+<script src="js/axios.js"></script>
+<script src="element-ui/lib/index.js"></script>
+<link rel="stylesheet" href="element-ui/lib/theme-chalk/index.css">
+
+<script>
+    new Vue({
+        el: "#app",
+        mounted() {
+           this.selectAll()
+        },
+        methods: {
+            // selectAll(){
+            //     axios({
+            //         method: "get",
+            //         url: "http://localhost:8080/imageManagement/disease/selectAll"
+            //     }).then(resp => {
+            //         this.dataList = resp.data
+            //     });
+            // },
+            selectAll(){
+                // axios({
+                //     method: "get",
+                //     url: "http://localhost:8080/imageManagement/disease/selectByPage?currentPage="+this.currentPage+"&pageSize="+this.pageSize
+                // }).then(resp => {
+                //     this.dataList = resp.data.rows;
+                //     this.totalCount=resp.data.totalCount;
+                // });
+                axios({
+                    method: "post",
+                    url: "http://10.181.198.75:8080/imageManagement/disease/selectByPageAndCondition?currentPage="+this.currentPage+"&pageSize="+this.pageSize,
+                    data:this.diseaseData
+                }).then(resp => {
+                    this.dataList = resp.data.rows;
+                    this.totalCount=resp.data.totalCount;
+                });
+            },
+            handleChange() {
+                //清空二级的内容
+                delete this.diseaseData.diseaseName
+            },
+            geturl(itempath) {
+                return this.imageRoot + itempath;
+            },
+            onSubmitSelect() {
+                // axios({
+                //     method: "post",
+                //     url: "http://localhost:8080/imageManagement/disease/selectBy",
+                //     data:this.diseaseData
+                // }).then(resp => {
+                //     this.dataList = resp.data
+                // });
+                this.selectAll()
+            },
+
+            //超限制
+            handleExceed(files, fileList) {
+                this.$message.warning("目前只能上传一张图像")
+            },
+            beforeUploadFile(file) {
+                let extension = file.name.substring(file.name.lastIndexOf('.') + 1);
+                let size = file.size / 1024 / 1024;
+                console.log(extension)
+                if (['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'psd', 'svg', 'tiff'].indexOf(extension.toLowerCase()) === -1) {
+                    this.$message.warning('文件类型不对'); //控制文件类型
+                    return false
+                }
+                if (size > 5) {
+                    this.$message.warning('文件大小不得超过5M');
+                }
+            },
+            //上传
+            getFile(file, fileList) {
+                this.fileList.push(file.raw);
+                this.fileList = fileList;//必须的
+                // console.log(this.fileList)
+                const fd = new FormData()// FormData 对象
+                this.fd = fd
+            },
+
+            httpRequest(param) {
+                const fileObj = param.file // 相当于input里取得的files
+                this.fd.append('imagefile', fileObj) // 文件对象
+            },
+
+            //提交
+            onSubmitForm() {
+                if (this.fileList.length === 0) {
+                    this.$message.warning('请上传图像');
+                } else {
+                    // this.$refs.upload.submit();
+                    //换行自动添加为<br/>
+                    // this.ruleForm.log= this.ruleForm.log.replace(/\n/g,"<br/>");
+                    // console.log(this.ruleForm.log)
+                    //将表单内其他内容添加进fd
+                    this.fd.append('cropName', this.diseaseData.cropName)
+                    this.fd.append('diseaseName', this.diseaseData.diseaseName)
+                    // console.log(this.fd.get("cropName"))
+                    // console.log( this.diseaseData.cropName)
+
+                    this.fullscreenLoading = true
+                    axios({
+                        method: "post",
+                        url: "http://10.181.198.75:8080/imageManagement/disease/add",
+                        data: this.fd,
+                        headers: {
+                            'Content-type': 'multipart/form-data'
+                        }
+                    }).then(resp => {
+                        if (resp.status === 200) {
+                            this.selectAll()
+
+                            this.$message({
+                                message: '上传成功',
+                                type: 'success'
+                            });
+                            // this.fd = {}
+                            // this.fileList = []
+                            // this.resetForm(formName)
+                        } else {
+                            this.$message.error("上传失败");
+                        }
+                        this.dialogVisible = false;//关闭对话框
+                        this.fullscreenLoading = false;
+                        this.$refs.form.resetFields();//清除表单信息
+                        this.$refs.upload.clearFiles();//清空上传列表
+                        this.fileList = [];//集合清空
+                        this.fd = {};
+                        // this.diseaseData.cropName='';
+                        // this.diseaseData.diseaseName='';
+                    })
+                    //     } else {
+                    //         // console.log('error submit!!');
+                    //         return false;
+                    //     }
+                    // })
+                }
+            },
+            //重置
+            // resetForm(formName) {
+            //     this.$refs[formName].resetFields();
+            //     this.$refs.upload.clearFiles()
+            // },
+            // 获取数组中数值的下标
+            indexOf(val,ids) {
+                for (let i = 0; i < ids.length; i++) {
+                    //获取当前值的下标
+                    if (ids[i] === val)
+                        return i;
+                }
+                return -1;
+            },
+            ids(val) {
+                let ids = this.selectionList;
+                //检索下标,判断当前值(或对象是否在数组中); 在则返回下标,不在则返回-1
+                let index = this.indexOf(val,ids);
+                if (ids.length >0 && index > -1) {
+                    //删除数组中的某个元素(在取消勾选时,删除数组中的值)
+                    ids.splice(index,1);
+                }else {
+                    //添加到数组中
+                    ids.push(val);
+                    //用逗号隔开
+                    ids.join(",");
+                }
+                // console.log(this.selectionList)
+            },
+            deleteByids(){
+                if (this.selectionList.length === 0) {
+                    this.$message.warning('请选择要删除的图像');
+                } else {
+                    this.$confirm("确定将选择数据删除?", {
+                        confirmButtonText: "确定",
+                        cancelButtonText: "取消",
+                        type: "warning"
+                    }).then(() => {
+                        axios({
+                            method: "post",
+                            url: "http://10.181.198.75:8080/imageManagement/disease/deleteByids",
+                            data: this.selectionList
+                        }).then(resp => {
+                            if (resp.data === "success") {
+                                this.selectAll()
+                                this.$message({
+                                    message: '删除成功',
+                                    type: 'success'
+                                });
+                            } else {
+                                this.$message.error("删除失败");
+                            }
+                        })
+                    })
+                }
+            },
+
+            handleSizeChange(val) {
+                this.pageSize=val
+                // console.log(`每页 ${val} 条`);
+                this.currentPage=1
+                this.selectAll()
+            },
+            handleCurrentChange(val) {
+                this.currentPage=val
+                // console.log(`当前页: ${val}`);
+                this.selectAll()
+            },
+
+        },
+        data() {
+            return {
+                //疾病数据
+                diseaseData: {
+                    cropName: '',
+                    diseaseName: '',
+                    id: '',
+                    imagePath: '',
+                    addTime: ''
+                },
+                cropItem: ['水稻', '玉米', '小麦', '甜菜', '苜蓿', '葡萄', '柑橘', '芒果'],
+                diseaseItem: [['稻纵卷叶螟', '稻叶毛虫','稻潜叶蝇','水稻二化螟','水稻三化螟','稻瘿蚊','稻秆蝇','褐稻虱','白背飞虱','灰飞虱','稻水象甲','稻叶蝉','谷物撒布机蓟马','稻苞虫' ],
+                    ['蛴螬',
+                    '蝼蛄',
+                    '金针虫',
+                    '白边蛾',
+                    '小地老虎',
+                    '大地老虎',
+                    '黄地老虎',
+                    '玉米螟',
+                    '夜蛾',
+                    '蚜虫',
+                    '白星花金龟',
+                    '桃蛀螟'
+                ], ['麦长管蚜',
+                    '麦二叉蚜',
+                    '燕麦蚜',
+                    '麦红吸浆虫',
+                    '小麦红蜘蛛',
+                    '长腿蜘蛛螨',
+                    '小麦根皮蓟马',
+                    '麦叶蜂',
+                    '麦黑斑潜叶蝇'
+                ], ['甜菜潜叶蝇',
+                    '跳甲',
+                    '甘蓝夜蛾',
+                    '甜菜夜蛾',
+                    '甜菜斑蝇',
+                    '草地螟',
+                    '甜菜象虫',
+                    '东方绢金龟'], [
+                    '苜蓿叶象甲',
+                    '苜蓿夜蛾',
+                    '苜蓿盲蝽',
+                    '牧草盲蝽',
+                    '蝗总科',
+                    '磨光东鳖甲',
+                    '豆科水疱甲虫',
+                    '水疱甲虫',
+                    '苜蓿斑蚜',
+                    '牛角花齿蓟马',
+                    '蓟马',
+                    '苜蓿广肩小蜂',
+                    '东方菜粉蝶'
+                ], ['绿盲蝽',
+                    '刺蛾科',
+                    '葡萄根瘤蚜',
+                    '葡萄缺节瘿螨',
+                    '南天竹刘氏短须螨',
+                    '十星叶甲',
+                    '侧多食附线螨',
+                    '康氏粉蚧',
+                    '葡萄透翅蛾',
+                    '萄葡天蛾',
+                    '斑衣蜡蝉',
+                    '四带虎天牛',
+                    '大青叶蝉',
+                    '盲蝽科',
+                    '温室粉虱',
+                    '斑叶蝉'
+                ], ['柑橘凤蝶',
+                    '柑橘红蜘蛛',
+                    '柑橘锈螨',
+                    '吹绵蚧',
+                    '矢尖蚧',
+                    '红蜡蚧',
+                    '黑褐圆盾蚧',
+                    '黑点介壳虫',
+                    '堆蜡粉蚧',
+                    '黑刺粉虱',
+                    '柑橘大实蝇',
+                    '芒果柑桔小实蝇',
+                    '蜜柑大实蝇',
+                    '斜纹夜蛾',
+                    '枯叶夜蛾',
+                    '柑桔潜叶蛾',
+                    '花椒蚜虫',
+                    '茶蚜',
+                    '绣线菊蚜',
+                ], ['茶黄蓟马',
+                    '荔枝叶瘿蚊',
+                    '白翅蜡蝉',
+                    '褐缘蛾蜡蝉',
+                    '芒果切叶象甲',
+                    '横线尾夜蛾',
+                    '叶蝉',
+                    '脊胸天牛',
+                    '芒果果肉象甲',
+                    '叶蝉科'
+                ]],
+                dialogVisible: false,
+                fullscreenLoading: false,
+                dataList: {},
+                fileList: [],
+                fd: {},//放文件，formData类型 {}
+                imageRoot: '/mapperfile/',//已修改tomcat的server配置
+                selectionList:[],
+                // checked:false
+                currentPage:1,
+                pageSize:24,
+                totalCount:100,
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
